@@ -1,18 +1,19 @@
 // Acrylic Panel Frame Builder
-// Parametric 2-sided (L) or 4-sided multi-panel acrylic frame with
-// 45° mitered ends and interior tongue/groove interlocks.
+// Parametric 1-, 2-, or 4-sided multi-panel acrylic frame.
+// 1-sided: single rail, square ends with end caps (no joints).
+// 2-sided (L) / 4-sided: 45° mitered ends with tongue/groove interlocks.
 // Units: millimeters
 
 /* [Frame Style] */
-// 2 = L-shaped stand; 4 = closed picture frame
-num_sides = 2; // [2, 4]
+// 1 = single rail; 2 = L-shaped stand; 4 = closed picture frame
+num_sides = 2; // [1, 2, 4]
 // Chamfer the long outer top edges of the profile
 bevel_outer = true;
 // assembled = visual check; printable = parts laid flat for export
 layout = "printable"; // ["assembled", "printable"]
 // Ghost acrylic panels in assembled view
 show_panels = true;
-// 2-sided free-end styles (non-joining ends):
+// 2-sided free-end styles (non-joining ends); ignored for 1-sided (always capped)
 //   mitered = 45° cut; open = square, slots through; closed = square with end wall
 // Length rail = bottom / horizontal (along panel_length)
 length_end_style = "mitered"; // ["mitered", "open", "closed"]
@@ -76,15 +77,19 @@ interlock_h = min(frame_height * interlock_face_fraction, interlock_h_max);
 
 // Outer pad = material under the slot floor, so acrylic sits inset from
 // the outside of the frame (not flush with the outer corner).
+// 1-sided: no miter pads; outer_wall end caps on both ends.
 // 2-sided: pad only at the joining corner; free ends stay flush with the panel.
 // 4-sided: pad on both ends of each rail.
 outer_pad       = frame_under_slot;
-rail_pad_count  = num_sides == 2 ? 1 : 2;
-// Closed free ends add an outer_wall-thick cap beyond the panel
-length_end_cap  = (num_sides == 2 && length_end_style == "closed") ? outer_wall : 0;
+rail_pad_count  = num_sides == 1 ? 0 : (num_sides == 2 ? 1 : 2);
+// End caps add an outer_wall-thick wall beyond the panel
+length_end_cap  = num_sides == 1 ? 2 * outer_wall
+                : (num_sides == 2 && length_end_style == "closed") ? outer_wall : 0;
 width_end_cap   = (num_sides == 2 && width_end_style  == "closed") ? outer_wall : 0;
 bottom_rail_len = panel_length + rail_pad_count * outer_pad + length_end_cap;
 side_rail_len   = panel_width  + rail_pad_count * outer_pad + width_end_cap;
+// Panel X inset: end-cap thickness on 1-sided; miter pad otherwise
+panel_x_inset   = num_sides == 1 ? outer_wall : outer_pad;
 
 length_end_mitered = (length_end_style == "mitered");
 length_end_closed  = (length_end_style == "closed");
@@ -259,10 +264,11 @@ module interior_grooves(at_start = true, length = 0, phase = 0) {
             }
 }
 
-// Cap that closes panel slots at a square free end (thickness = outer_wall).
-// Uses the same outer-edge bevel as the rail profile when requested.
-module end_cap(length, bevel = false) {
-    translate([length - outer_wall, 0, 0])
+// Cap that closes panel slots at a square end (thickness = outer_wall).
+// `x` is the start of the cap along the rail. Uses the same outer-edge
+// bevel as the rail profile when requested.
+module end_cap_at(x, bevel = false) {
+    translate([x, 0, 0])
         rotate([90, 0, 90])
             linear_extrude(height = outer_wall, convexity = 4)
                 difference() {
@@ -284,9 +290,10 @@ module end_cap(length, bevel = false) {
 
 // ---------------------------------------------------------------------------
 // One rail
-//   miter_*      : apply clean 45° end cut
-//   interlock_*  : add interior tongue/groove (joining ends only)
-//   closed_end   : square free end with outer_wall-thick slot cap
+//   miter_*       : apply clean 45° end cut
+//   interlock_*   : add interior tongue/groove (joining ends only)
+//   closed_start  : square start with outer_wall-thick slot cap
+//   closed_end    : square end with outer_wall-thick slot cap
 // ---------------------------------------------------------------------------
 module frame_rail(
     length,
@@ -297,6 +304,7 @@ module frame_rail(
     phase_start = 0,
     phase_end = 0,
     bevel = false,
+    closed_start = false,
     closed_end = false
 ) {
     union() {
@@ -323,9 +331,11 @@ module frame_rail(
         if (miter_end && interlock_end)
             interior_tongues(false, length, phase_end);
 
-        // Closed free end: solid wall capping the slots
+        // Closed square ends: solid walls capping the slots
+        if (closed_start)
+            end_cap_at(0, bevel);
         if (closed_end)
-            end_cap(length, bevel);
+            end_cap_at(length - outer_wall, bevel);
     }
 }
 
@@ -346,15 +356,31 @@ module flip_stack() {
 }
 
 module acrylic_panels() {
-    // Inset by frame_under_slot so edges sit on the slot floors
+    // Inset so edges sit on the slot floors / against end caps
     color([0.55, 0.8, 1.0, 0.35])
         for (i = [0 : num_panels - 1])
             translate([
-                outer_pad,
+                panel_x_inset,
                 slot_y(i) + slot_tolerance / 2,
                 outer_pad
             ])
                 cube([panel_length, panel_thickness, panel_width]);
+}
+
+// ---------------------------------------------------------------------------
+// 1-sided: single rail, end caps both ends, no miters / interlocks
+// ---------------------------------------------------------------------------
+module assembled_1() {
+    color("SteelBlue")
+        frame_rail(
+            bottom_rail_len,
+            bevel = bevel_outer,
+            closed_start = true,
+            closed_end = true
+        );
+
+    if (show_panels)
+        acrylic_panels();
 }
 
 // ---------------------------------------------------------------------------
@@ -446,7 +472,14 @@ module assembled_4() {
 }
 
 module printable_parts() {
-    if (num_sides == 2) {
+    if (num_sides == 1) {
+        frame_rail(
+            bottom_rail_len,
+            bevel = bevel_outer,
+            closed_start = true,
+            closed_end = true
+        );
+    } else if (num_sides == 2) {
         // Side phase: same as bottom when flip_mates (odd panel count),
         // opposite otherwise — flip one part when standing it up.
         side_phase = mate_phase(0);
@@ -501,6 +534,8 @@ echo(str("width_end_style = ", width_end_style));
 
 if (layout == "printable")
     printable_parts();
+else if (num_sides == 1)
+    assembled_1();
 else if (num_sides == 2)
     assembled_2();
 else
