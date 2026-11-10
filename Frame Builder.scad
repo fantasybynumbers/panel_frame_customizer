@@ -43,8 +43,10 @@ outer_wall = 3;
 bevel_size = 2;
 
 /* [Corner Joint] */
-// Clearance on interior tongues / grooves (per side, and on top)
-joint_tolerance = 0;
+// Lateral clearance on interior tongues / grooves (per side)
+joint_side_tolerance = 0;
+// Vertical clearance above interior tongues / grooves
+joint_top_tolerance = 0;
 // Fraction of the 45° face used by tongues/slots, measured from the base
 interlock_face_fraction = 0.75;
 // Tongue/groove thickness inside the wall (stack direction); 0 = auto
@@ -70,8 +72,8 @@ interior_wall_count = max(0, wall_count - 2);
 // Thin tongue inside the wall — leaves wall material on both sides
 tab_t_raw = tab_thickness > 0 ? tab_thickness : min(1.2, gap_between_panels / 2);
 // Tongue/slot height along the miter (from the base); top of face left clear for tolerance.
-// Cap so interlock_h + joint_tolerance never exceeds frame height.
-interlock_h_max = frame_under_slot + slot_depth - joint_tolerance;
+// Cap so interlock_h + joint_top_tolerance never exceeds frame height.
+interlock_h_max = frame_under_slot + slot_depth - joint_top_tolerance;
 interlock_h = min(frame_height * interlock_face_fraction, interlock_h_max);
 
 // Outer pad = material under the slot floor, so acrylic sits inset from
@@ -208,11 +210,12 @@ module tongue_triangle_2d() {
 }
 
 module groove_triangle_2d() {
-    // Solid-side triangle matching the tongue, with joint_tolerance on the
-    // sides and top. Bottom stays at z = 0 (no cut into the build-plate
-    // base). Top tolerance uses the unused upper quarter of the miter face
-    // so it does not run past the top of the rail.
-    t = joint_tolerance;
+    // Solid-side triangle matching the tongue, with joint_top_tolerance on
+    // the top. Bottom stays at z = 0 (no cut into the build-plate base).
+    // Top tolerance uses the unused upper quarter of the miter face so it
+    // does not run past the top of the rail. Lateral clearance is applied
+    // separately via joint_side_tolerance in interior_grooves().
+    t = joint_top_tolerance;
     h = interlock_h;
     top = min(h + t, frame_height);
     polygon([
@@ -253,8 +256,8 @@ module interior_grooves(at_start = true, length = 0, phase = 0) {
         for (k = [0 : interior_wall_count - 1])
             if (k % 2 != phase) {
                 i = interior_wall_id(k);
-                // Lateral clearance: same joint_tolerance used on the top
-                t = tongue_t(i) + 2 * joint_tolerance;
+                // Lateral clearance from joint_side_tolerance (per side)
+                t = tongue_t(i) + 2 * joint_side_tolerance;
                 y = wall_y(i) + (wall_thickness(i) - t) / 2;
                 if (at_start)
                     thin_prism_xy(y, t)
