@@ -15,8 +15,7 @@ layout = "printable"; // ["assembled", "printable"]
 show_panels = true;
 // Free-end styles (ignored for 4-sided — all ends join):
 //   mitered = 45° cut; open = square, slots through; closed = square with end wall
-// 1-sided: style 1 = start of rail, style 2 = end of rail
-// 2-sided: style 1 = free end of bottom/length rail, style 2 = free end of side/width rail
+// 1-sided: style 1 and 2 for either rail end. 2-sided: Each style applies to one non-joint end
 end_style_1 = "mitered"; // ["mitered", "open", "closed"]
 end_style_2 = "mitered"; // ["mitered", "open", "closed"]
 
@@ -33,11 +32,11 @@ panel_thickness = 2;
 // How far the acrylic sits into each groove
 slot_depth = 6;
 // Extra clearance added to slot opening width
-slot_tolerance = 0.3;
+slot_tolerance = 0.2;
 // Solid wall between neighboring panel slots
 gap_between_panels = 3;
 // Solid material under the slot floor
-frame_under_slot = 3;
+frame_under_slot = 2;
 // Material outside the first and last slot
 outer_wall = 3;
 // Long-edge outer chamfer size when bevel_outer is true
@@ -45,14 +44,14 @@ bevel_size = 2;
 
 /* [Corner Joint] */
 // Clearance on interior tongues / grooves (per side, and on top)
-joint_tolerance = 0.15;
+joint_tolerance = 0;
 // Fraction of the 45° face used by tongues/slots, measured from the base
 interlock_face_fraction = 0.75;
 // Tongue/groove thickness inside the wall (stack direction); 0 = auto
 tab_thickness = 0;
 
 /* [Print Layout] */
-print_spacing = 12;
+print_spacing = 5;
 
 /* [Hidden] */
 eps = 0.05;
